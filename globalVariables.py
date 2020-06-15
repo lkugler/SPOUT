@@ -6,8 +6,8 @@ global modelParams, TrackerParams, modelData
 # Set up common arrays and constants.
 #----------------------------------------------------------------------
 modelParams = {}
-modelParams['INPUTROOT']  = 'C:\Users\wterwey\Desktop\WRFFiles'
-modelParams['OUTPUTROOT'] = 'C:\Users\wterwey\Desktop\WRFTest'
+modelParams['INPUTROOT']  = '/raid60/raid/home/srvx7/lehre/users/a1254888/VSC/OSSE_v1.10_LMU+shear/1/'
+modelParams['OUTPUTROOT'] = '/raid60/raid/home/srvx7/lehre/users/a1254888/VSC/osse_analysis/output/SPOUT'
 modelParams['g'] = 9.8
 
 
@@ -49,7 +49,7 @@ modelParams['g'] = 9.8
 # V winds (and the velFudge factor), a prior updraft is "advected" to
 # a new point.  For it to be (potentially) temporally linked, it must
 # be within RANKTHRES distance of this advected point.
-# 
+#
 # POINTTHRES is the vertial spatial threshold that must be satisfied
 # for the temporal linking of updrafts.  Prior and current updrafts
 # must have a number of updraft levels within POINTTHRES number of
@@ -70,14 +70,14 @@ modelParams['g'] = 9.8
 # checkValues is the array that states what the minimal vertical
 # velocity is for each level's maxima to be qualified for
 # updraft status.
-# 
+#
 # updraftData is the actual array that tracks the information for the
 # updrafts currently being tracked.  It is a 4-D array:
 #   1.) ID of the variable being tracked
 #   2.) ID number of the updraft
 #   3.) Vertical profile of each updraft
 #   4.) Time for each updraft.
-# This array is filled usually with BADVALUE. 
+# This array is filled usually with BADVALUE.
 #----------------------------------------------------------------------
 
 TrackerParams = {}
@@ -85,7 +85,7 @@ TrackerParams['BADVALUE']        = -999.9
 TrackerParams['WTHRES']          = 0.0
 TrackerParams['MINUPLEVEL']      = 3
 TrackerParams['MINUPHEIGHT']     = 4
-TrackerParams['NUMLEVELS']       = 20
+TrackerParams['NUMLEVELS']       = 25
 TrackerParams['SPACETHRES']      = 2
 TrackerParams['RANKTHRES']       = 5.0
 TrackerParams['POINTTHRES']      = 6
@@ -93,7 +93,7 @@ TrackerParams['OUTPUTTIMETHRES'] = 3
 TrackerParams['velCorrect']        = 1.0
 
 tempar = np.zeros(TrackerParams['NUMLEVELS']) + TrackerParams['MINUPLEVEL']
-TrackerParams['checkLevels'] = tempar
+TrackerParams['checkLevels'] = tempar.astype(np.int32)  # force integer type
 
 tempar = np.zeros(TrackerParams['NUMLEVELS'], float) + 1.5
 TrackerParams['checkValues'] = tempar

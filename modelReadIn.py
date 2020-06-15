@@ -1,14 +1,16 @@
 import netCDF4
 import math
 import numpy as np
+from numba import njit
 import globalVariables as GV
 global modelParams, TrackerParams, modelData
+
 
 # ==================================
 # Basic interpolation function
 # ==================================
 
-
+@njit
 def interp2hgt(zlo, zhi, varlo, varhi, zcur):
     return (varhi - varlo) * (zcur - zlo) / (zhi - zlo) + varlo
 
@@ -52,21 +54,20 @@ def modelData_ReadInFromFile_WRF(filename, time_index=0):
     ny = ph.shape[3]
     nzp1 = nz + 1
 
-    ph = fileRead.variables['PH'][:].transpose((3, 2, 1, 0))[:, :, :, t]
-    phb = fileRead.variables['PHB'][:].transpose((3, 2, 1, 0))[:, :, :, t]
-    theta = fileRead.variables['T'][:].transpose((3, 2, 1, 0))[:, :, :, t]
-    p = fileRead.variables['P'][:].transpose((3, 2, 1, 0))[:, :, :, t]
-    pb = fileRead.variables['PB'][:].transpose((3, 2, 1, 0))[:, :, :, t]
-    qvapor = fileRead.variables['QVAPOR'][:].transpose((3, 2, 1, 0))[
-        :, :, :, 0]
-    u = fileRead.variables['U'][:].transpose((3, 2, 1, 0))[:, :, :, t]
-    v = fileRead.variables['V'][:].transpose((3, 2, 1, 0))[:, :, :, t]
-    w = fileRead.variables['W'][:].transpose((3, 2, 1, 0))[:, :, :, t]
-    znu = fileRead.variables['ZNU'][:][0, :]
-    znw = fileRead.variables['ZNW'][:][0, :]
-    mu = fileRead.variables['MU'][:][0, :, :]
-    mub = fileRead.variables['MUB'][:][0, :, :]
-    p_top = fileRead.variables['P_TOP'][:][0]
+    ph = fileRead.variables['PH'][t,...].transpose((2, 1, 0))[:, :, :]
+    phb = fileRead.variables['PHB'][t,...].transpose((2, 1, 0))[:, :, :]
+    theta = fileRead.variables['T'][t,...].transpose((2, 1, 0))[:, :, :]
+    p = fileRead.variables['P'][t,...].transpose((2, 1, 0))[:, :, :]
+    pb = fileRead.variables['PB'][t,...].transpose((2, 1, 0))[:, :, :]
+    qvapor = fileRead.variables['QVAPOR'][t,...].transpose((2, 1, 0))[:, :, :]
+    u = fileRead.variables['U'][t,...].transpose((2, 1, 0))[:, :, :]
+    v = fileRead.variables['V'][t,...].transpose((2, 1, 0))[:, :, :]
+    w = fileRead.variables['W'][t,...].transpose((2, 1, 0))[:, :, :]
+    znu = fileRead.variables['ZNU'][t, :]
+    znw = fileRead.variables['ZNW'][t, :]
+    mu = fileRead.variables['MU'][t, :, :]
+    mub = fileRead.variables['MUB'][t, :, :]
+    p_top = fileRead.variables['P_TOP'][t]
 
     p = p + pb
     ph = ph + phb
@@ -86,65 +87,76 @@ def modelData_ReadInFromFile_WRF(filename, time_index=0):
                                                          (1.0e+00 + 1.61e+00 * qvapor))
     temp = theta * np.power((p / p0), kappa)
 
+    @njit(parallel=True)
+    def calc_gph(ph, temp, mu, znu, znw, p_top):
+        """Calculating geopotential heights at regular grid points"""
+        phup = np.zeros((nx, ny, nz), np.float64)
+        phdown = np.zeros((nx, ny, nz), np.float64)
+        phit = np.zeros((nx, ny, nz), np.float64)
+
+        for i in range(nx):
+            for j in range(ny):
+                phup[i, j, 0] = ph[i, j, 0] - \
+                    rd * (3.0e+00 * temp[i, j, 0] -
+                          1.5e+00 * (temp[i, j, 0] + temp[i, j, 1]) +
+                          1.0e+00 * temp[i, j, 1]) * \
+                    np.log((mu[i, j] * znu[0] + p_top) /
+                             (mu[i, j] * znw[0] + p_top))
+                phdown[i, j, 0] = ph[i, j, 1] - \
+                    rd * 0.5 * (temp[i, j, 0] + temp[i, j, 1]) * \
+                    np.log((mu[i, j] * znu[0] + p_top) /
+                             (mu[i, j] * znw[1] + p_top))
+                phit[i, j, 0] = 0.5 * (phup[i, j, 0] + phdown[i, j, 0])
+
+                for k in np.arange(1, nz-3, 1):
+                    phup[i, j, k] = ph[i, j, k] - \
+                        rd * 0.5 * (temp[i, j, k] + temp[i, j, k-1]) * \
+                        np.log((mu[i, j] * znu[k] + p_top) /
+                                 (mu[i, j] * znw[k] + p_top))
+                    phdown[i, j, k] = ph[i, j, k+1] - \
+                        rd * 0.5 * (temp[i, j, k] + temp[i, j, k+1]) * \
+                        np.log((mu[i, j] * znu[k] + p_top) /
+                                 (mu[i, j] * znw[k+1] + p_top))
+                    phit[i, j, k] = 0.5 * (phup[i, j, k] + phdown[i, j, k])
+
+                phup[i, j, nz-2] = ph[i, j, nz-2] - \
+                    rd * 0.5 * (temp[i, j, nz-2] + temp[i, j, nz-2]) * \
+                    np.log((mu[i, j] * znu[nz-2] + p_top) /
+                             (mu[i, j] * znw[nz-2] + p_top))
+                phdown[i, j, nz-2] = ph[i, j, nzp1-2] - \
+                    rd * (3.0e+00 * temp[i, j, nz-2] -
+                          1.5e+00 * (temp[i, j, nz-2] + temp[i, j, nz-2]) +
+                          1.0e+00 * temp[i, j, nz-2]) * \
+                    np.log((mu[i, j] * znu[nz-2] + p_top) /
+                             (mu[i, j] * znw[nzp1-2] + p_top))
+                phit[i, j, nz-2] = 0.5 * (phup[i, j, nz-2] + phdown[i, j, nz-2])
+        return phit
+
+    @njit(parallel=True)
+    def calc_velocities(u, v, w):
+        """Interpolating velocity components..."""
+        u2 = np.zeros((nx, ny, nz), np.float64)
+        v2 = np.zeros((nx, ny, nz), np.float64)
+        w2 = np.zeros((nx, ny, nz), np.float64)
+
+        for i in np.arange(0, nx-1, 1):
+            for j in np.arange(0, ny, 1):
+                for k in np.arange(0, nz-1, 1):
+                    u2[i, j, k] = 0.5 * (u[i, j, k] + u[i+1, j, k])
+                    v2[j, i, k] = 0.5 * (v[j, i, k] + v[j, i+1, k])
+
+        for i in np.arange(0, nz-1, 1):
+            for j in np.arange(0, nx, 1):
+                for k in np.arange(0, ny, 1):
+                    w2[j, k, i] = 0.5 * (w[j, k, i] + w[j, k, i+1])
+        return u2, v2, w2
+
+
     print('Calculating geopotential heights at regular grid points')
-    phup = np.zeros((nx, ny, nz), float)
-    phdown = np.zeros((nx, ny, nz), float)
-    phit = np.zeros((nx, ny, nz), float)
-
-    for i in range(nx):
-        for j in range(ny):
-            phup[i, j, 0] = ph[i, j, 0] - \
-                rd * (3.0e+00 * temp[i, j, 0] -
-                      1.5e+00 * (temp[i, j, 0] + temp[i, j, 1]) +
-                      1.0e+00 * temp[i, j, 1]) * \
-                math.log((mu[i, j] * znu[0] + p_top) /
-                         (mu[i, j] * znw[0] + p_top))
-            phdown[i, j, 0] = ph[i, j, 1] - \
-                rd * 0.5 * (temp[i, j, 0] + temp[i, j, 1]) * \
-                math.log((mu[i, j] * znu[0] + p_top) /
-                         (mu[i, j] * znw[1] + p_top))
-            phit[i, j, 0] = 0.5 * (phup[i, j, 0] + phdown[i, j, 0])
-
-            for k in np.arange(1, nz-3, 1):
-                phup[i, j, k] = ph[i, j, k] - \
-                    rd * 0.5 * (temp[i, j, k] + temp[i, j, k-1]) * \
-                    math.log((mu[i, j] * znu[k] + p_top) /
-                             (mu[i, j] * znw[k] + p_top))
-                phdown[i, j, k] = ph[i, j, k+1] - \
-                    rd * 0.5 * (temp[i, j, k] + temp[i, j, k+1]) * \
-                    math.log((mu[i, j] * znu[k] + p_top) /
-                             (mu[i, j] * znw[k+1] + p_top))
-                phit[i, j, k] = 0.5 * (phup[i, j, k] + phdown[i, j, k])
-
-            phup[i, j, nz-2] = ph[i, j, nz-2] - \
-                rd * 0.5 * (temp[i, j, nz-2] + temp[i, j, nz-2]) * \
-                math.log((mu[i, j] * znu[nz-2] + p_top) /
-                         (mu[i, j] * znw[nz-2] + p_top))
-            phdown[i, j, nz-2] = ph[i, j, nzp1-2] - \
-                rd * (3.0e+00 * temp[i, j, nz-2] -
-                      1.5e+00 * (temp[i, j, nz-2] + temp[i, j, nz-2]) +
-                      1.0e+00 * temp[i, j, nz-2]) * \
-                math.log((mu[i, j] * znu[nz-2] + p_top) /
-                         (mu[i, j] * znw[nzp1-2] + p_top))
-            phit[i, j, nz-2] = 0.5 * (phup[i, j, nz-2] + phdown[i, j, nz-2])
-
-    del phup, phdown
+    phit = calc_gph(ph, temp, mu, znu, znw, p_top)
 
     print("Interpolating velocity components...")
-    u2 = np.zeros((nx, ny, nz), float)
-    v2 = np.zeros((nx, ny, nz), float)
-    w2 = np.zeros((nx, ny, nz), float)
-
-    for i in np.arange(0, nx-1, 1):
-        for j in np.arange(0, ny, 1):
-            for k in np.arange(0, nz-1, 1):
-                u2[i, j, k] = 0.5 * (u[i, j, k] + u[i+1, j, k])
-                v2[j, i, k] = 0.5 * (v[j, i, k] + v[j, i+1, k])
-
-    for i in np.arange(0, nz-1, 1):
-        for j in np.arange(0, nx, 1):
-            for k in np.arange(0, ny, 1):
-                w2[j, k, i] = 0.5 * (w[j, k, i] + w[j, k, i+1])
+    u2, v2, w2 = calc_velocities(u, v, w)
 
     print('Interpolating variables to physical height grid')
 

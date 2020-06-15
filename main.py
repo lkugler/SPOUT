@@ -54,6 +54,7 @@ outputfile = open(GV.modelParams['OUTPUTROOT'] + '/finalUpdrafts.dat', 'w')
 idNum = 0
 
 for t in range(frames):
+    print('time index', t, 'of', frames)
 
     if assume_allframes_firstfile:
         currFile = fileList[0]
@@ -62,7 +63,7 @@ for t in range(frames):
         currFile = fileList[t]
         modelread.modelData_ReadInFromFile_WRF(currFile, time_index=0)
 
-
+    print(GV.modelParams)
 
     print('Establishing current time updrafts...')
 
@@ -75,6 +76,7 @@ for t in range(frames):
     #-----------------------------------------------------
 
     for m in GV.TrackerParams['checkLevels'][::-1]:
+        print('level', m)
         testArray = GV.modelData['W'][:, :, m]
         mVal = m - GV.TrackerParams['MINUPHEIGHT'] + 1
         checkVal = GV.TrackerParams['checkValues'][mVal]
