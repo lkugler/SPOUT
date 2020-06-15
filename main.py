@@ -24,11 +24,11 @@ idNum = 0
 for number in range(10):
     currFile = fileList[number]
     t = t + 1
-    print GV.modelParams['INPUTROOT']+'/'+currFile
-    modelread.modelData_ReadInFromFile_WRF(GV.modelParams['INPUTROOT']+'/'+currFile)   
-    
-    print 'Establishing current time updrafts...'
-    
+    print(GV.modelParams['INPUTROOT']+'/'+currFile)
+    modelread.modelData_ReadInFromFile_WRF(GV.modelParams['INPUTROOT']+'/'+currFile)
+
+    print('Establishing current time updrafts...')
+
     curr3D = []
 
     #-----------------------------------------------------
@@ -64,10 +64,10 @@ for number in range(10):
                             (testArray[i, j] >= testArray[i, j+1] + wTh) and \
                             (testArray[i, j] >= testArray[i+1, j+1] + wTh) and \
                             (testArray[i, j] >= testArray[i, j+2] + wTh)):
-                            
+
                             tempData = f2D.found2Dupdraft(i, j, m)
                             tempDraft = up.updraft2D(i, j, m, t, tempData)
-                            
+
                             if (m == max(GV.TrackerParams['checkLevels'])):
                                 curr3D.append(up.updraft3D([tempDraft], m))
                             # If at the top level, start new 3D updrafts; if
@@ -83,7 +83,7 @@ for number in range(10):
                                                 tempRangeY = abs(j - upTemp2.yPos)
                                                 if ((tempRangeX <= GV.TrackerParams['SPACETHRES']) and \
                                                     (tempRangeY <= GV.TrackerParams['SPACETHRES'])):
-                                                    
+
                                                     currRank = (tempRangeX ** 2.0 + tempRangeY ** 2.0) ** 0.5
                                                     if (currRank < tempRank):
                                                         tempRank = currRank
@@ -105,7 +105,7 @@ for number in range(10):
         tempRange = upTemp3.vertRange()
         if (tempRange[1]-tempRange[0]+1 >= GV.TrackerParams['MINUPHEIGHT']):
             newCurr3D.append(upTemp3)
-    
+
     if (t == 0):
         for temp3D in newCurr3D:
             updrafts.append(up.updraft4D([temp3D], t, idNum))
