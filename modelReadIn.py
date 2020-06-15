@@ -21,7 +21,8 @@ def interp2hgt(zlo, zhi, varlo, varhi, zcur):
 # interpolation to this grid is done here.  The zLevels array specifies the
 # vertical level interpolation points.
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-def modelData_ReadInFromFile_WRF(filename):
+def modelData_ReadInFromFile_WRF(filename, time_index=0):
+    t = time_index
 
     zgrid = [50.0, 107.307, 205.706, 334.344, 496.915,
              701.513, 953.557, 1254.76, 1617.94, 2035.14,
@@ -51,16 +52,16 @@ def modelData_ReadInFromFile_WRF(filename):
     ny = ph.shape[3]
     nzp1 = nz + 1
 
-    ph = fileRead.variables['PH'][:].transpose((3, 2, 1, 0))[:, :, :, 0]
-    phb = fileRead.variables['PHB'][:].transpose((3, 2, 1, 0))[:, :, :, 0]
-    theta = fileRead.variables['T'][:].transpose((3, 2, 1, 0))[:, :, :, 0]
-    p = fileRead.variables['P'][:].transpose((3, 2, 1, 0))[:, :, :, 0]
-    pb = fileRead.variables['PB'][:].transpose((3, 2, 1, 0))[:, :, :, 0]
+    ph = fileRead.variables['PH'][:].transpose((3, 2, 1, 0))[:, :, :, t]
+    phb = fileRead.variables['PHB'][:].transpose((3, 2, 1, 0))[:, :, :, t]
+    theta = fileRead.variables['T'][:].transpose((3, 2, 1, 0))[:, :, :, t]
+    p = fileRead.variables['P'][:].transpose((3, 2, 1, 0))[:, :, :, t]
+    pb = fileRead.variables['PB'][:].transpose((3, 2, 1, 0))[:, :, :, t]
     qvapor = fileRead.variables['QVAPOR'][:].transpose((3, 2, 1, 0))[
         :, :, :, 0]
-    u = fileRead.variables['U'][:].transpose((3, 2, 1, 0))[:, :, :, 0]
-    v = fileRead.variables['V'][:].transpose((3, 2, 1, 0))[:, :, :, 0]
-    w = fileRead.variables['W'][:].transpose((3, 2, 1, 0))[:, :, :, 0]
+    u = fileRead.variables['U'][:].transpose((3, 2, 1, 0))[:, :, :, t]
+    v = fileRead.variables['V'][:].transpose((3, 2, 1, 0))[:, :, :, t]
+    w = fileRead.variables['W'][:].transpose((3, 2, 1, 0))[:, :, :, t]
     znu = fileRead.variables['ZNU'][:][0, :]
     znw = fileRead.variables['ZNW'][:][0, :]
     mu = fileRead.variables['MU'][:][0, :, :]

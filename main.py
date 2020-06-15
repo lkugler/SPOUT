@@ -10,22 +10,59 @@ from matplotlib import cm
 
 global modelParams, TrackerParams, modelData
 
+def is_netcdf(filename):
+    try:
+        netCDF4.Dataset(filename, 'r')
+        return True
+    except:
+        return False
+
+def count_frames_in_netcdf(filename):
+    return len(netCDF4.Dataset(filename, 'r').variables["XTIME"])
+
+def list_WRFout_in_path(dir_path):
+    files = os.listdir(dir_path)
+    wrfs = []
+    for f in files:
+        fpath = os.path.join(dir_path, f)
+        if not f.startswith('wrfinput'):  # ignore wrfinput files
+            if is_netcdf(fpath):
+                wrfs.append(fpath)
+    return sorted(wrfs)
+
+def count_frames_in_wrffiles(fileList):
+    """Count number of time frames. Input absolute paths."""
+    frames = 0
+    for f in fileList:
+        frames += count_frames_in_netcdf(f)
+    return frames
+
+
 updrafts = []
 
-fileList = os.listdir(GV.modelParams['INPUTROOT'])
-fileList = sorted(fileList)
-t = -1
+fileList = list_WRFout_in_path(GV.modelParams['INPUTROOT'])
+frames = count_frames_in_wrffiles(fileList)
 
+if frames != len(fileList):
+    print('File with multiple frames found (WRF: `frames_per_outfile` > 1). '
+          'Assuming all frames are within first file.')
+    assume_allframes_firstfile = True
+
+os.makedirs(GV.modelParams['OUTPUTROOT'], exist_ok=True)
 outputfile = open(GV.modelParams['OUTPUTROOT'] + '/finalUpdrafts.dat', 'w')
 
 idNum = 0
 
-#for currFile in fileList:
-for number in range(10):
-    currFile = fileList[number]
-    t = t + 1
-    print(GV.modelParams['INPUTROOT']+'/'+currFile)
-    modelread.modelData_ReadInFromFile_WRF(GV.modelParams['INPUTROOT']+'/'+currFile)
+for t in range(frames):
+
+    if assume_allframes_firstfile:
+        currFile = fileList[0]
+        modelread.modelData_ReadInFromFile_WRF(currFile, time_index=t)
+    else:  # each frame in separate file
+        currFile = fileList[t]
+        modelread.modelData_ReadInFromFile_WRF(currFile, time_index=0)
+
+
 
     print('Establishing current time updrafts...')
 
