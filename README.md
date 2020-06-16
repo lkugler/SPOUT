@@ -3,9 +3,14 @@ SPOUT
 
 Statistical and Programmable Objective Updraft Tracker
 
-------------------------------------------------------------------------------------------------------------
+forked from Wesley Terwey
 
-Please check out the Wiki for more information.
+------------------------------------------------------------------------------------------------------------
+UPDATES by me (lkugler):
+- compatible with python3
+- much faster due to numba JIT compilation and parallelization of loops
+- some minor changes that I found necessary
+- still under development
 
 ------------------------------------------------------------------------------------------------------------
 UPDATE (11/6/19): Thanks to some renewed interest in SPOUT, I will be adding in some new features.  Primary among them
