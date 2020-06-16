@@ -10,21 +10,22 @@ from mpl_toolkits.mplot3d import Axes3D
 
 global modelParams, TrackerParams, modelData
 
-inputfile = open('finalUpdrafts.dat', 'r')
+inputfile =  open(GV.modelParams['OUTPUTROOT']+'/finalUpdrafts.dat', 'rb')
 updrafts  = []
 
-print 'Loading updrafts...'
+print('Loading updrafts...')
 
 try:
     while True:
         data = pickle.load(inputfile)
         updrafts.append(data)
 except EOFError:
-    print 'Done reading in updrafts...'
+    print('Done reading in updrafts...')
 
 inputfile.close()
 
-for t in range(240):
+for t in range(10): #240):
+    print('t:', t)
     fig2D = plt.figure()
     fig3D = plt.figure()
     ax2D = fig2D.add_subplot(111)
@@ -32,6 +33,10 @@ for t in range(240):
     ax.set_xlim3d(0, 250)
     ax.set_ylim3d(0, 250)
     ax.set_zlim3d(0, 30)
+
+    if len(updrafts) == 0:
+        print('No updrafts in this frame.')
+
     for temp4D in updrafts:
         temp3D = temp4D.findTime(t)
         if (temp3D != -1):
@@ -42,6 +47,7 @@ for t in range(240):
                 x.append(temp2D.xPos)
                 y.append(temp2D.yPos)
                 z.append(temp2D.zPos)
+            print(x, y, z)
 
             ax.plot(x, y, z, color="black")
             ax.text(x[0], y[0], z[0]+1, str(temp4D.ident))
@@ -54,9 +60,7 @@ for t in range(240):
             ax2D.text(xAvg, yAvg+5, str(temp4D.ident), fontsize=6)
 
     tStr = str(t)
-    figName = 'currentUpdrafts' + tStr + '.png'
+    figName = GV.modelParams['OUTPUTROOT']+'/currentUpdrafts' + tStr + '.png'
     fig3D.savefig(figName)
-    figName = 'currentUpdrafts2D' + tStr + '.png'
+    figName = GV.modelParams['OUTPUTROOT']+'/currentUpdrafts2D' + tStr + '.png'
     fig2D.savefig(figName)
-
-

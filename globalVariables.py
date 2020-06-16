@@ -7,7 +7,7 @@ global modelParams, TrackerParams, modelData
 #----------------------------------------------------------------------
 modelParams = {}
 modelParams['INPUTROOT']  = '/raid60/raid/home/srvx7/lehre/users/a1254888/VSC/OSSE_v1.10_LMU+shear/1/'
-modelParams['OUTPUTROOT'] = '/raid60/raid/home/srvx7/lehre/users/a1254888/VSC/osse_analysis/output/SPOUT'
+modelParams['OUTPUTROOT'] = '/raid60/raid/home/srvx7/lehre/users/a1254888/osse_analysis/output/SPOUT'
 modelParams['g'] = 9.8
 
 
@@ -86,9 +86,9 @@ modelParams['g'] = 9.8
 TrackerParams = {}
 TrackerParams['BADVALUE']        = -999.9
 TrackerParams['WTHRES']          = 0.0
-TrackerParams['MINUPLEVEL']      = 5
-TrackerParams['MINUPHEIGHT']     = 5  # TODO: whats the difference to MINUPLEVEL
-TrackerParams['NUMLEVELS']       = 25
+TrackerParams['MINUPLEVEL']      = 4
+TrackerParams['MINUPHEIGHT']     = 4  # TODO: whats the difference to MINUPLEVEL
+TrackerParams['NUMLEVELS']       = 20
 TrackerParams['SPACETHRES']      = 2
 TrackerParams['RANKTHRES']       = 5.0
 TrackerParams['POINTTHRES']      = 6
