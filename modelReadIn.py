@@ -1,7 +1,7 @@
 import netCDF4
 import math
 import numpy as np
-from numba import njit
+from numba import njit, prange
 import globalVariables as GV
 global modelParams, TrackerParams, modelData
 
@@ -26,13 +26,13 @@ def interp2hgt(zlo, zhi, varlo, varhi, zcur):
 def modelData_ReadInFromFile_WRF(filename, time_index=0):
     t = time_index
 
-    zgrid = [50.0, 107.307, 205.706, 334.344, 496.915,
+    zgrid = np.array([50.0, 107.307, 205.706, 334.344, 496.915,
              701.513, 953.557, 1254.76, 1617.94, 2035.14,
              2504.95, 3027.17, 3605.44, 4247.20, 4941.06,
              5715.49, 6492.84, 7305.57, 8122.98, 8914.02,
              9741.23, 10578.8, 11418.7, 12260.2, 13107.5,
              13977.3, 14843.9, 15830.8, 16832.0, 17951.9,
-             19213.7, 20862.0, 22934.2, 24000.0]
+             19213.7, 20862.0, 22934.2, 24000.0], np.float32)
     nz2 = len(zgrid)
 
     fileRead = netCDF4.Dataset(filename, 'r')
@@ -87,15 +87,15 @@ def modelData_ReadInFromFile_WRF(filename, time_index=0):
                                                          (1.0e+00 + 1.61e+00 * qvapor))
     temp = theta * np.power((p / p0), kappa)
 
-    @njit(parallel=True)
+    @njit
     def calc_gph(ph, temp, mu, znu, znw, p_top):
         """Calculating geopotential heights at regular grid points"""
         phup = np.zeros((nx, ny, nz), np.float64)
         phdown = np.zeros((nx, ny, nz), np.float64)
         phit = np.zeros((nx, ny, nz), np.float64)
 
-        for i in range(nx):
-            for j in range(ny):
+        for i in prange(nx):
+            for j in prange(ny):
                 phup[i, j, 0] = ph[i, j, 0] - \
                     rd * (3.0e+00 * temp[i, j, 0] -
                           1.5e+00 * (temp[i, j, 0] + temp[i, j, 1]) +
@@ -132,25 +132,70 @@ def modelData_ReadInFromFile_WRF(filename, time_index=0):
                 phit[i, j, nz-2] = 0.5 * (phup[i, j, nz-2] + phdown[i, j, nz-2])
         return phit
 
-    @njit(parallel=True)
+    @njit
     def calc_velocities(u, v, w):
         """Interpolating velocity components..."""
         u2 = np.zeros((nx, ny, nz), np.float64)
         v2 = np.zeros((nx, ny, nz), np.float64)
         w2 = np.zeros((nx, ny, nz), np.float64)
 
-        for i in np.arange(0, nx-1, 1):
-            for j in np.arange(0, ny, 1):
-                for k in np.arange(0, nz-1, 1):
+        for i in prange(0, nx-1):
+            for j in prange(0, ny):
+                for k in prange(0, nz-1):
                     u2[i, j, k] = 0.5 * (u[i, j, k] + u[i+1, j, k])
                     v2[j, i, k] = 0.5 * (v[j, i, k] + v[j, i+1, k])
 
-        for i in np.arange(0, nz-1, 1):
-            for j in np.arange(0, nx, 1):
-                for k in np.arange(0, ny, 1):
+        for i in prange(0, nz-1):
+            for j in prange(0, nx):
+                for k in prange(0, ny):
                     w2[j, k, i] = 0.5 * (w[j, k, i] + w[j, k, i+1])
         return u2, v2, w2
 
+    @njit
+    def interp_grid(phit, p, u2, v2, w2, theta, rho, qvapor):
+        """Interpolating variables to physical height grid"""
+        pgd = np.zeros((nx, ny, nz2-2), np.float32)
+        ugd = np.zeros((nx, ny, nz2-2), np.float32)
+        vgd = np.zeros((nx, ny, nz2-2), np.float32)
+        wgd = np.zeros((nx, ny, nz2-2), np.float64)
+        thgd = np.zeros((nx, ny, nz2-2), np.float32)
+        rhogd = np.zeros((nx, ny, nz2-2), np.float32)
+        qvgd = np.zeros((nx, ny, nz2-2), np.float64)
+
+        klo = 0
+        khi = 0
+        for k in np.arange(1, nz2-2, 1):
+            for i in prange(nx):
+                for j in prange(ny):
+                    dzhi = 9.9e+09
+                    dzlo = 9.9e+09
+                    zhi = -9.9e+09
+                    zlo = -9.9e+09
+                    for l in np.arange(0, nz, 1):
+                        zlev = phit[i, j, l] / g
+                        if ((zgrid[k] - zlev) >= 0.0 and (zgrid[k] - zlev) < dzlo):
+                            dzlo = zgrid[k] - zlev
+                            zlo = zlev
+                            klo = 1
+                        if ((zlev - zgrid[k]) > 0.0 and (zlev - zgrid[k]) < dzhi):
+                            dzhi = zgrid[k] - zlev
+                            zhi = zlev
+                            khi = 1
+                    pgd[i, j, k-1] = interp2hgt(zlo, zhi,
+                                                p[i, j, klo], p[i, j, khi], zgrid[k])
+                    ugd[i, j, k-1] = interp2hgt(zlo, zhi,
+                                                u2[i, j, klo], u2[i, j, khi], zgrid[k])
+                    vgd[i, j, k-1] = interp2hgt(zlo, zhi,
+                                                v2[i, j, klo], v2[i, j, khi], zgrid[k])
+                    wgd[i, j, k-1] = interp2hgt(zlo, zhi,
+                                                w2[i, j, klo], w2[i, j, khi], zgrid[k])
+                    thgd[i, j, k-1] = interp2hgt(zlo, zhi,
+                                                 theta[i, j, klo], theta[i, j, khi], zgrid[k])
+                    rhogd[i, j, k-1] = interp2hgt(zlo, zhi,
+                                                  rho[i, j, klo], rho[i, j, khi], zgrid[k])
+                    qvgd[i, j, k-1] = interp2hgt(zlo, zhi,
+                                                 qvapor[i, j, klo], qvapor[i, j, khi], zgrid[k])
+        return pgd, ugd, vgd, wgd, thgd, rhogd, qvgd
 
     print('Calculating geopotential heights at regular grid points')
     phit = calc_gph(ph, temp, mu, znu, znw, p_top)
@@ -159,48 +204,7 @@ def modelData_ReadInFromFile_WRF(filename, time_index=0):
     u2, v2, w2 = calc_velocities(u, v, w)
 
     print('Interpolating variables to physical height grid')
-
-    pgd = np.zeros((nx, ny, nz2-2), float)
-    ugd = np.zeros((nx, ny, nz2-2), float)
-    vgd = np.zeros((nx, ny, nz2-2), float)
-    wgd = np.zeros((nx, ny, nz2-2), float)
-    thgd = np.zeros((nx, ny, nz2-2), float)
-    rhogd = np.zeros((nx, ny, nz2-2), float)
-    qvgd = np.zeros((nx, ny, nz2-2), float)
-
-    klo = 0
-    khi = 0
-    for k in np.arange(1, nz2-2, 1):
-        for i in np.arange(0, nx, 1):
-            for j in np.arange(0, ny, 1):
-                dzhi = 9.9e+09
-                dzlo = 9.9e+09
-                zhi = -9.9e+09
-                zlo = -9.9e+09
-                for l in np.arange(0, nz, 1):
-                    zlev = phit[i, j, l] / g
-                    if ((zgrid[k] - zlev) >= 0.0 and (zgrid[k] - zlev) < dzlo):
-                        dzlo = zgrid[k] - zlev
-                        zlo = zlev
-                        klo = 1
-                    if ((zlev - zgrid[k]) > 0.0 and (zlev - zgrid[k]) < dzhi):
-                        dzhi = zgrid[k] - zlev
-                        zhi = zlev
-                        khi = 1
-                pgd[i, j, k-1] = interp2hgt(zlo, zhi,
-                                            p[i, j, klo], p[i, j, khi], zgrid[k])
-                ugd[i, j, k-1] = interp2hgt(zlo, zhi,
-                                            u2[i, j, klo], u2[i, j, khi], zgrid[k])
-                vgd[i, j, k-1] = interp2hgt(zlo, zhi,
-                                            v2[i, j, klo], v2[i, j, khi], zgrid[k])
-                wgd[i, j, k-1] = interp2hgt(zlo, zhi,
-                                            w2[i, j, klo], w2[i, j, khi], zgrid[k])
-                thgd[i, j, k-1] = interp2hgt(zlo, zhi,
-                                             theta[i, j, klo], theta[i, j, khi], zgrid[k])
-                rhogd[i, j, k-1] = interp2hgt(zlo, zhi,
-                                              rho[i, j, klo], rho[i, j, khi], zgrid[k])
-                qvgd[i, j, k-1] = interp2hgt(zlo, zhi,
-                                             qvapor[i, j, klo], qvapor[i, j, khi], zgrid[k])
+    pgd, ugd, vgd, wgd, thgd, rhogd, qvgd = interp_grid(phit, p, u2, v2, w2, theta, rho, qvapor)
 
     GV.modelParams['NX'] = nx
     GV.modelParams['NY'] = ny
@@ -215,13 +219,14 @@ def modelData_ReadInFromFile_WRF(filename, time_index=0):
     GV.modelParams['T0'] = 0.0
     GV.modelParams['F0'] = f0[0, :, 0]
 
-    GV.modelData['P'] = pgd
-    GV.modelData['U'] = ugd
-    GV.modelData['V'] = vgd
-    GV.modelData['W'] = wgd
-    GV.modelData['THETA'] = thgd
-    GV.modelData['RHO'] = rhogd
-    GV.modelData['QV'] = qvgd
+    # originally, variables were GV.modelData['P'] or GV.modelData['THETA'] etc.
+    GV.P = pgd
+    GV.U = ugd
+    GV.V = vgd
+    GV.W = wgd
+    GV.THETA = thgd
+    GV.RHO = rhogd
+    GV.QV = qvgd
 
     GV.modelParams['ZARR'] = zgrid[1:-2]
 

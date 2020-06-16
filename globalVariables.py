@@ -78,28 +78,31 @@ modelParams['g'] = 9.8
 #   3.) Vertical profile of each updraft
 #   4.) Time for each updraft.
 # This array is filled usually with BADVALUE.
+#
+# SKIPFRAMES is the integer number of time frames to skip in order to speed up
+# calculating
 #----------------------------------------------------------------------
 
 TrackerParams = {}
 TrackerParams['BADVALUE']        = -999.9
 TrackerParams['WTHRES']          = 0.0
-TrackerParams['MINUPLEVEL']      = 3
-TrackerParams['MINUPHEIGHT']     = 4
+TrackerParams['MINUPLEVEL']      = 5
+TrackerParams['MINUPHEIGHT']     = 5  # TODO: whats the difference to MINUPLEVEL
 TrackerParams['NUMLEVELS']       = 25
 TrackerParams['SPACETHRES']      = 2
 TrackerParams['RANKTHRES']       = 5.0
 TrackerParams['POINTTHRES']      = 6
 TrackerParams['OUTPUTTIMETHRES'] = 3
-TrackerParams['velCorrect']        = 1.0
+TrackerParams['velCorrect']      = 1.0
+TrackerParams['SKIPFRAMES']      = 48
 
 tempar = np.zeros(TrackerParams['NUMLEVELS']) + TrackerParams['MINUPLEVEL']
-TrackerParams['checkLevels'] = tempar.astype(np.int32)  # force integer type
+TrackerParams['checkLevels'] = tempar.astype(np.int32)  # integer for indexing
 
-tempar = np.zeros(TrackerParams['NUMLEVELS'], float) + 1.5
+tempar = np.zeros(TrackerParams['NUMLEVELS'], np.float32) + 1.5
 TrackerParams['checkValues'] = tempar
 
 updraftData = []
-
 
 #######################################################################
 #----------------------------------------------------------------------

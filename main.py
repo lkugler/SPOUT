@@ -53,7 +53,8 @@ outputfile = open(GV.modelParams['OUTPUTROOT'] + '/finalUpdrafts.dat', 'w')
 
 idNum = 0
 
-for t in range(frames):
+skipframes = GV.TrackerParams.get('SKIPFRAMES', 0)  # ignore first n frames
+for t in range(skipframes, frames):
     print('time index', t, 'of', frames)
 
     if assume_allframes_firstfile:
@@ -62,8 +63,6 @@ for t in range(frames):
     else:  # each frame in separate file
         currFile = fileList[t]
         modelread.modelData_ReadInFromFile_WRF(currFile, time_index=0)
-
-    print(GV.modelParams)
 
     print('Establishing current time updrafts...')
 
@@ -75,9 +74,10 @@ for t in range(frames):
     # 3D updrafts.
     #-----------------------------------------------------
 
+    # TODO: why does it need to run 20 times with the same level index?
     for m in GV.TrackerParams['checkLevels'][::-1]:
         print('level', m)
-        testArray = GV.modelData['W'][:, :, m]
+        testArray = GV.W[:, :, m]
         mVal = m - GV.TrackerParams['MINUPHEIGHT'] + 1
         checkVal = GV.TrackerParams['checkValues'][mVal]
         wTh = GV.TrackerParams['WTHRES']
@@ -91,6 +91,7 @@ for t in range(frames):
                             if (testArray[i+x, j+y] > checkVal):
                                 tempTotal = tempTotal + 1
                     if (tempTotal >= 5):
+                        print('inner')
                         if ((testArray[i, j] >= testArray[i-2, j] + wTh) and \
                             (testArray[i, j] >= testArray[i-1, j] + wTh) and \
                             (testArray[i, j] >= testArray[i+1, j] + wTh) and \
@@ -114,6 +115,7 @@ for t in range(frames):
                             else:
                                 connection = 0
                                 tempRank   = 1000.0
+                                print('vertrange')
                                 for upTemp3 in curr3D:
                                     if (((upTemp3.vertRange())[0] == m + 1)):
                                         for upTemp2 in upTemp3.linked2DUpdrafts:
@@ -138,6 +140,7 @@ for t in range(frames):
                                     temp3Updraft.linked2DUpdrafts.append(tempDraft)
                                     temp3Updraft.bottomHeight = m
 
+    print('secondpart')
     # Complete the 3D updraft finder for the current time.
     newCurr3D = []
     for upTemp3 in curr3D:
